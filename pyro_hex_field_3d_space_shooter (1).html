@@ -1,0 +1,1904 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>PYRO // HEX-FIELD 3D</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+      :root {
+        --bg-void: #030305;
+        --white: #ffffff;
+        --silver: #d4d8e2;
+        --muted: #788091;
+        --cyan: #00e5ff;
+        --cyan-deep: #0077ff;
+        --danger: #ff3b5c;
+        --panel-bg: rgba(8, 10, 15, 0.78);
+        --border-dim: rgba(255, 255, 255, 0.16);
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background-color: #030305 !important;
+        color: var(--white);
+        font-family: 'Rajdhani', sans-serif;
+      }
+
+      #game-container {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 1;
+        background-color: #030305;
+      }
+
+      canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      /* HUD Overlay */
+      #hud {
+        position: fixed;
+        inset: 0;
+        z-index: 10;
+        pointer-events: none;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding: 16px 22px;
+      }
+
+      /* Top Boss Bar */
+      .boss-hud {
+        width: min(740px, 94vw);
+        margin: 0 auto;
+        background: var(--panel-bg);
+        border: 1px solid var(--border-dim);
+        border-radius: 10px;
+        padding: 10px 16px;
+        backdrop-filter: blur(8px);
+        box-shadow: 0 0 28px rgba(0, 0, 0, 0.85);
+      }
+
+      .boss-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-bottom: 6px;
+        gap: 8px;
+      }
+
+      .boss-title {
+        font-family: 'Orbitron', sans-serif;
+        font-size: clamp(0.76rem, 1.8vw, 0.95rem);
+        font-weight: 800;
+        letter-spacing: 0.16em;
+        color: var(--white);
+        text-shadow: 0 0 10px rgba(255, 255, 255, 0.45);
+      }
+
+      .boss-hp-text {
+        font-family: 'Orbitron', sans-serif;
+        font-size: clamp(0.72rem, 1.5vw, 0.85rem);
+        color: var(--silver);
+        letter-spacing: 0.08em;
+      }
+
+      .boss-bar-wrap {
+        position: relative;
+        width: 100%;
+        height: 12px;
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 6px;
+        overflow: visible;
+        border: 1px solid rgba(255, 255, 255, 0.22);
+      }
+
+      .boss-bar-fill {
+        height: 100%;
+        width: 100%;
+        border-radius: 5px;
+        background: linear-gradient(90deg, #aeb6c7 0%, #ffffff 100%);
+        box-shadow: 0 0 14px rgba(255, 255, 255, 0.75);
+        transition: width 0.08s linear;
+      }
+
+      .threshold-marker {
+        position: absolute;
+        top: -5px;
+        bottom: -5px;
+        left: 75%;
+        width: 2px;
+        background: var(--cyan);
+        box-shadow: 0 0 10px var(--cyan), 0 0 18px var(--cyan);
+        z-index: 3;
+      }
+
+      .threshold-tag {
+        position: absolute;
+        top: 15px;
+        left: 75%;
+        transform: translateX(-50%);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.58rem;
+        letter-spacing: 0.1em;
+        color: var(--cyan);
+        white-space: nowrap;
+        text-shadow: 0 0 8px rgba(0, 229, 255, 0.8);
+      }
+
+      /* Tactical Orbit & Damage Telemetry */
+      .telemetry-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-top: 18px;
+        gap: 12px;
+      }
+
+      .stat-card {
+        background: var(--panel-bg);
+        border: 1px solid var(--border-dim);
+        border-radius: 10px;
+        padding: 10px 14px;
+        backdrop-filter: blur(8px);
+        min-width: 165px;
+      }
+
+      .stat-label {
+        font-size: 0.68rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--muted);
+        font-weight: 700;
+      }
+
+      .stat-value {
+        font-family: 'Orbitron', sans-serif;
+        font-size: clamp(1rem, 2.2vw, 1.35rem);
+        font-weight: 800;
+        color: var(--white);
+        margin-top: 2px;
+        text-shadow: 0 0 12px rgba(255, 255, 255, 0.35);
+      }
+
+      .stat-sub {
+        font-size: 0.75rem;
+        color: var(--silver);
+        margin-top: 2px;
+        letter-spacing: 0.06em;
+      }
+
+      .danger-badge {
+        display: inline-block;
+        margin-top: 4px;
+        padding: 2px 7px;
+        border-radius: 4px;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.62rem;
+        letter-spacing: 0.1em;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        color: var(--white);
+      }
+
+      .danger-badge.high-risk {
+        border-color: var(--cyan);
+        color: var(--cyan);
+        box-shadow: 0 0 10px rgba(0, 229, 255, 0.3);
+      }
+
+      /* Bottom HUD */
+      .bottom-hud {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        gap: 14px;
+        flex-wrap: wrap;
+      }
+
+      .hull-card {
+        background: var(--panel-bg);
+        border: 1px solid var(--border-dim);
+        border-radius: 10px;
+        padding: 10px 14px;
+        backdrop-filter: blur(8px);
+        width: min(260px, 44vw);
+      }
+
+      .hull-bar-bg {
+        width: 100%;
+        height: 8px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 4px;
+        margin-top: 6px;
+        overflow: hidden;
+      }
+
+      .hull-bar-fill {
+        height: 100%;
+        width: 100%;
+        background: #ffffff;
+        box-shadow: 0 0 10px #ffffff;
+        transition: width 0.12s ease;
+      }
+
+      .special-card {
+        background: var(--panel-bg);
+        border: 1px solid var(--border-dim);
+        border-radius: 10px;
+        padding: 10px 16px;
+        backdrop-filter: blur(8px);
+        min-width: 240px;
+        text-align: right;
+        transition: all 0.25s ease;
+      }
+
+      .special-card.ready {
+        border-color: var(--cyan);
+        box-shadow: 0 0 22px rgba(0, 229, 255, 0.45), inset 0 0 14px rgba(0, 229, 255, 0.2);
+      }
+
+      .special-title {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        color: var(--muted);
+      }
+
+      .special-card.ready .special-title {
+        color: var(--cyan);
+        text-shadow: 0 0 10px var(--cyan);
+      }
+
+      .special-progress-bg {
+        width: 100%;
+        height: 7px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 4px;
+        margin-top: 6px;
+        overflow: hidden;
+      }
+
+      .special-progress-fill {
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, var(--cyan-deep), var(--cyan));
+        box-shadow: 0 0 12px var(--cyan);
+        transition: width 0.15s ease;
+      }
+
+      /* Top-Right Audio Toggle */
+      .audio-btn {
+        pointer-events: auto;
+        position: fixed;
+        top: 16px;
+        right: 18px;
+        z-index: 25;
+        background: var(--panel-bg);
+        border: 1px solid var(--border-dim);
+        color: var(--white);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.68rem;
+        letter-spacing: 0.1em;
+        padding: 7px 11px;
+        border-radius: 8px;
+        cursor: pointer;
+        backdrop-filter: blur(8px);
+      }
+
+      .audio-btn:hover {
+        border-color: var(--white);
+        box-shadow: 0 0 12px rgba(255, 255, 255, 0.3);
+      }
+
+      /* Modal / Lobby Overlay */
+      #overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 20;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        background: radial-gradient(circle at center, rgba(5, 8, 16, 0.55) 0%, rgba(2, 3, 6, 0.9) 100%);
+        backdrop-filter: blur(5px);
+        transition: opacity 0.35s ease;
+      }
+
+      #overlay.hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .modal-box {
+        width: min(560px, 94vw);
+        background: rgba(8, 10, 16, 0.9);
+        border: 1px solid rgba(255, 255, 255, 0.28);
+        border-radius: 16px;
+        padding: 28px 26px;
+        text-align: center;
+        box-shadow: 0 0 50px rgba(0, 0, 0, 0.9), 0 0 25px rgba(255, 255, 255, 0.08);
+      }
+
+      .modal-kicker {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.72rem;
+        letter-spacing: 0.25em;
+        color: var(--cyan);
+        margin-bottom: 8px;
+        text-shadow: 0 0 10px rgba(0, 229, 255, 0.6);
+      }
+
+      .modal-title {
+        font-family: 'Orbitron', sans-serif;
+        font-size: clamp(1.5rem, 4vw, 2.25rem);
+        font-weight: 900;
+        letter-spacing: 0.14em;
+        color: var(--white);
+        text-shadow: 0 0 18px rgba(255, 255, 255, 0.5);
+        margin-bottom: 12px;
+      }
+
+      .modal-desc {
+        font-size: 1rem;
+        line-height: 1.5;
+        color: var(--silver);
+        margin-bottom: 18px;
+      }
+
+      .controls-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+        text-align: left;
+        margin-bottom: 22px;
+      }
+
+      .ctrl-item {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 8px;
+        padding: 8px 11px;
+        font-size: 0.85rem;
+        color: var(--silver);
+      }
+
+      .ctrl-key {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.72rem;
+        color: var(--white);
+        font-weight: 700;
+        display: block;
+        margin-bottom: 2px;
+      }
+
+      .ctrl-key.cyan {
+        color: var(--cyan);
+      }
+
+      .launch-btn {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.95rem;
+        font-weight: 800;
+        letter-spacing: 0.18em;
+        color: #030305;
+        background: #ffffff;
+        border: none;
+        border-radius: 10px;
+        padding: 14px 34px;
+        cursor: pointer;
+        box-shadow: 0 0 24px rgba(255, 255, 255, 0.65);
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+      }
+
+      .launch-btn:hover {
+        transform: translateY(-2px) scale(1.02);
+        box-shadow: 0 0 34px rgba(255, 255, 255, 0.95);
+      }
+
+      /* Mobile Touch Controls */
+      #touch-controls {
+        display: none;
+        pointer-events: auto;
+        position: fixed;
+        bottom: 78px;
+        left: 16px;
+        right: 16px;
+        z-index: 15;
+        justify-content: space-between;
+        align-items: flex-end;
+      }
+
+      @media (pointer: coarse), (max-width: 768px) {
+        #touch-controls {
+          display: flex;
+        }
+        .controls-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .dpad {
+        display: grid;
+        grid-template-columns: repeat(3, 48px);
+        grid-template-rows: repeat(2, 48px);
+        gap: 6px;
+      }
+
+      .touch-btn {
+        background: rgba(12, 15, 24, 0.82);
+        border: 1px solid rgba(255, 255, 255, 0.28);
+        border-radius: 10px;
+        color: var(--white);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.85rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+      }
+
+      .touch-btn:active {
+        background: rgba(255, 255, 255, 0.25);
+      }
+
+      .touch-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .touch-fire {
+        width: 84px;
+        height: 50px;
+      }
+
+      .touch-special {
+        width: 84px;
+        height: 46px;
+        border-color: var(--cyan);
+        color: var(--cyan);
+      }
+
+      /* Tactical Center Reticle */
+      #reticle {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 26px;
+        height: 26px;
+        border: 1.5px solid rgba(255, 255, 255, 0.35);
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 9;
+        box-shadow: 0 0 12px rgba(255, 255, 255, 0.2);
+      }
+
+      #reticle::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 4px;
+        height: 4px;
+        background: #ffffff;
+        border-radius: 50%;
+        transform: translate(-50%, -50%);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="game-container"></div>
+    <div id="reticle"></div>
+
+    <button id="audio-toggle" class="audio-btn">SFX: ON</button>
+
+    <div id="hud">
+      <div>
+        <div class="boss-hud">
+          <div class="boss-header">
+            <span class="boss-title">COSMIC LEVIATHAN // OMEGA-HEX</span>
+            <span id="boss-hp-text" class="boss-hp-text">14,000 / 14,000 HP</span>
+          </div>
+          <div class="boss-bar-wrap">
+            <div id="boss-bar-fill" class="boss-bar-fill"></div>
+            <div class="threshold-marker"></div>
+            <div class="threshold-tag">25% OVERDRIVE UNLOCK</div>
+          </div>
+        </div>
+
+        <div class="telemetry-row">
+          <div class="stat-card">
+            <div class="stat-label">ORBITAL RING</div>
+            <div id="ring-readout" class="stat-value">RING 3 // MID</div>
+            <div id="threat-badge" class="danger-badge">AGGRESSION: MODERATE</div>
+          </div>
+
+          <div class="stat-card" style="text-align: right">
+            <div class="stat-label">PROXIMITY DMG</div>
+            <div id="mult-readout" class="stat-value">1.95x</div>
+            <div id="dist-readout" class="stat-sub">ORBIT RADIUS: 48m</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bottom-hud">
+        <div class="hull-card">
+          <div style="display: flex; justify-content: space-between; align-items: baseline">
+            <span class="stat-label">PYRO HULL INTEGRITY</span>
+            <span id="hull-text" class="stat-sub" style="font-family: 'Orbitron', sans-serif; color: #fff">100%</span>
+          </div>
+          <div class="hull-bar-bg">
+            <div id="hull-bar-fill" class="hull-bar-fill"></div>
+          </div>
+        </div>
+
+        <div id="special-card" class="special-card">
+          <div id="special-title" class="special-title">HYPER-BEAM // DEAL 25% DMG</div>
+          <div id="special-sub" class="stat-sub">0 / 3,500 DMG TO UNLOCK</div>
+          <div class="special-progress-bg">
+            <div id="special-progress-fill" class="special-progress-fill"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="touch-controls">
+      <div class="dpad">
+        <div></div>
+        <button id="btn-in" class="touch-btn">IN</button>
+        <div></div>
+        <button id="btn-left" class="touch-btn">&lt;</button>
+        <button id="btn-out" class="touch-btn">OUT</button>
+        <button id="btn-right" class="touch-btn">&gt;</button>
+      </div>
+      <div class="touch-actions">
+        <button id="btn-special" class="touch-btn touch-special">BEAM</button>
+        <button id="btn-fire" class="touch-btn touch-fire">FIRE</button>
+      </div>
+    </div>
+
+    <div id="overlay">
+      <div class="modal-box">
+        <div id="modal-kicker" class="modal-kicker">ORBITAL INTERCEPTOR // 3D HEX-FIELD</div>
+        <h1 id="modal-title" class="modal-title">PYRO // LEVIATHAN</h1>
+        <p id="modal-desc" class="modal-desc">
+          Orbit the Cosmic Leviathan along <strong>5 concentric planetary rings</strong>. Stepping into inner orbits amplifies Pyro's weapon damage up to <strong>4.00x</strong>, while awakening faster tentacle strikes and denser plasma barrages.
+        </p>
+        <div class="controls-grid">
+          <div class="ctrl-item">
+            <span class="ctrl-key">[A] / [D] OR ARROWS</span>
+            Orbit clockwise / counter-clockwise
+          </div>
+          <div class="ctrl-item">
+            <span class="ctrl-key">[W] / [S] OR UP / DOWN</span>
+            Shift inner (high DMG) / outer ring
+          </div>
+          <div class="ctrl-item">
+            <span class="ctrl-key">[SPACE] OR LEFT CLICK</span>
+            Fire twin forward pulse cannons
+          </div>
+          <div class="ctrl-item">
+            <span class="ctrl-key cyan">[E] OR RIGHT CLICK</span>
+            Forward Cyan Hyper-Beam (at 25% DMG)
+          </div>
+        </div>
+        <button id="launch-btn" class="launch-btn">ENGAGE ORBIT</button>
+      </div>
+    </div>
+
+    <script>
+      // =========================================================================
+      // PYRO // HEX-FIELD 3D — SEMI-CIRCULAR PLANETARY ORBIT EDITION
+      // =========================================================================
+
+      const container = document.getElementById('game-container');
+
+      // DOM References
+      const overlay = document.getElementById('overlay');
+      const modalKicker = document.getElementById('modal-kicker');
+      const modalTitle = document.getElementById('modal-title');
+      const modalDesc = document.getElementById('modal-desc');
+      const launchBtn = document.getElementById('launch-btn');
+      const audioToggleBtn = document.getElementById('audio-toggle');
+
+      const bossHpText = document.getElementById('boss-hp-text');
+      const bossBarFill = document.getElementById('boss-bar-fill');
+      const ringReadout = document.getElementById('ring-readout');
+      const threatBadge = document.getElementById('threat-badge');
+      const multReadout = document.getElementById('mult-readout');
+      const distReadout = document.getElementById('dist-readout');
+      const hullText = document.getElementById('hull-text');
+      const hullBarFill = document.getElementById('hull-bar-fill');
+      const specialCard = document.getElementById('special-card');
+      const specialTitle = document.getElementById('special-title');
+      const specialSub = document.getElementById('special-sub');
+      const specialProgressFill = document.getElementById('special-progress-fill');
+
+      // =========================================================================
+      // PROCEDURAL WEB AUDIO SYNTHESIZER (NO EXTERNAL ASSETS)
+      // =========================================================================
+      let audioCtx = null;
+      let sfxEnabled = true;
+
+      function initAudio() {
+        if (!audioCtx) {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (AudioContextClass) {
+            audioCtx = new AudioContextClass();
+          }
+        }
+        if (audioCtx && audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+      }
+
+      audioToggleBtn.addEventListener('click', () => {
+        sfxEnabled = !sfxEnabled;
+        audioToggleBtn.textContent = sfxEnabled ? 'SFX: ON' : 'SFX: OFF';
+      });
+
+      function playLaserSound(mult) {
+        if (!sfxEnabled || !audioCtx) return;
+        try {
+          const now = audioCtx.currentTime;
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sawtooth';
+          const baseFreq = 520 + mult * 95;
+          osc.frequency.setValueAtTime(baseFreq, now);
+          osc.frequency.exponentialRampToValueAtTime(140, now + 0.09);
+
+          gain.gain.setValueAtTime(0.06, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(now);
+          osc.stop(now + 0.095);
+        } catch (e) {}
+      }
+
+      function playRingShiftSound(ringIdx) {
+        if (!sfxEnabled || !audioCtx) return;
+        try {
+          const now = audioCtx.currentTime;
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'triangle';
+          const pitch = 300 + (4 - ringIdx) * 85;
+          osc.frequency.setValueAtTime(pitch, now);
+          osc.frequency.exponentialRampToValueAtTime(pitch * 1.35, now + 0.12);
+
+          gain.gain.setValueAtTime(0.07, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.13);
+
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(now);
+          osc.stop(now + 0.14);
+        } catch (e) {}
+      }
+
+      function playHyperBeamSound() {
+        if (!sfxEnabled || !audioCtx) return;
+        try {
+          const now = audioCtx.currentTime;
+          const osc1 = audioCtx.createOscillator();
+          const osc2 = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+
+          osc1.type = 'sawtooth';
+          osc2.type = 'sine';
+
+          osc1.frequency.setValueAtTime(110, now);
+          osc1.frequency.exponentialRampToValueAtTime(640, now + 0.42);
+          osc1.frequency.exponentialRampToValueAtTime(95, now + 1.55);
+
+          osc2.frequency.setValueAtTime(220, now);
+          osc2.frequency.exponentialRampToValueAtTime(1280, now + 0.42);
+          osc2.frequency.exponentialRampToValueAtTime(180, now + 1.55);
+
+          gain.gain.setValueAtTime(0.01, now);
+          gain.gain.linearRampToValueAtTime(0.18, now + 0.42);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 1.6);
+
+          osc1.connect(gain);
+          osc2.connect(gain);
+          gain.connect(audioCtx.destination);
+
+          osc1.start(now);
+          osc2.start(now);
+          osc1.stop(now + 1.62);
+          osc2.stop(now + 1.62);
+        } catch (e) {}
+      }
+
+      function playDamageSound() {
+        if (!sfxEnabled || !audioCtx) return;
+        try {
+          const now = audioCtx.currentTime;
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(150, now);
+          osc.frequency.exponentialRampToValueAtTime(48, now + 0.22);
+
+          gain.gain.setValueAtTime(0.11, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.23);
+
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(now);
+          osc.stop(now + 0.24);
+        } catch (e) {}
+      }
+
+      // =========================================================================
+      // THREE.JS SCENE, CAMERA & RENDERER SETUP
+      // =========================================================================
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x030305);
+      scene.fog = new THREE.FogExp2(0x030305, 0.0042);
+
+      const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 600);
+
+      const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.35));
+      renderer.setClearColor(0x030305, 1);
+      container.appendChild(renderer.domElement);
+
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+
+      // Lighting
+      const ambientLight = new THREE.AmbientLight(0xd8e0f0, 0.7);
+      scene.add(ambientLight);
+
+      const corePointLight = new THREE.PointLight(0xffffff, 2.2, 160);
+      corePointLight.position.set(0, 6, 0);
+      scene.add(corePointLight);
+
+      const rimLight = new THREE.DirectionalLight(0xaec2ff, 1.1);
+      rimLight.position.set(25, 45, 35);
+      scene.add(rimLight);
+
+      // =========================================================================
+      // 3D DEEP-SPACE STARFIELD
+      // =========================================================================
+      const starCount = 950;
+      const starGeo = new THREE.BufferGeometry();
+      const starPositions = new Float32Array(starCount * 3);
+      for (let i = 0; i < starCount; i++) {
+        const r = 110 + Math.random() * 260;
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos(2 * Math.random() - 1);
+        starPositions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+        starPositions[i * 3 + 1] = r * Math.cos(phi);
+        starPositions[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
+      }
+      starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+      const starMat = new THREE.PointsMaterial({
+        color: 0xffffff,
+        size: 1.15,
+        transparent: true,
+        opacity: 0.85,
+        sizeAttenuation: true
+      });
+      const starField = new THREE.Points(starGeo, starMat);
+      scene.add(starField);
+
+      // =========================================================================
+      // CONCENTRIC ORBITAL RING CONFIGURATION (5 SEMI-CIRCULAR RINGS)
+      // =========================================================================
+      // Ring 0 = Innermost (highest damage & highest boss aggression)
+      // Ring 4 = Outermost (safest & lowest damage)
+      const ORBIT_RINGS = [
+        { radius: 26, mult: 4.0, label: 'RING 1 // APEX', aggression: 1.85, threatText: 'AGGRESSION: EXTREME' },
+        { radius: 36, mult: 2.85, label: 'RING 2 // INNER', aggression: 1.45, threatText: 'AGGRESSION: HIGH' },
+        { radius: 48, mult: 1.95, label: 'RING 3 // MID', aggression: 1.1, threatText: 'AGGRESSION: MODERATE' },
+        { radius: 61, mult: 1.35, label: 'RING 4 // OUTER', aggression: 0.85, threatText: 'AGGRESSION: GUARDED' },
+        { radius: 75, mult: 1.0, label: 'RING 5 // RIM', aggression: 0.65, threatText: 'AGGRESSION: LOW' }
+      ];
+
+      const MAX_ORBIT_ANGLE = Math.PI * 0.62; // ~112 degrees left/right semi-circular planetary arc
+
+      // =========================================================================
+      // REACTIVE 3D HEX-FIELD PLANETARY LATTICE
+      // =========================================================================
+      const HEX_R = 3.2;
+      const hexFieldGroup = new THREE.Group();
+      hexFieldGroup.position.y = -4.2;
+      scene.add(hexFieldGroup);
+
+      const hexCells = [];
+      const hexRipples = [];
+
+      function createHexRingGeometry(radius) {
+        const pts = [];
+        for (let i = 0; i <= 6; i++) {
+          const a = (i / 6) * Math.PI * 2;
+          pts.push(new THREE.Vector3(Math.cos(a) * radius, 0, Math.sin(a) * radius));
+        }
+        return new THREE.BufferGeometry().setFromPoints(pts);
+      }
+
+      const sharedHexGeo = createHexRingGeometry(HEX_R * 0.92);
+      const sharedWhiteHexMat = new THREE.LineBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.16,
+        blending: THREE.AdditiveBlending
+      });
+      const sharedCyanHexMat = new THREE.LineBasicMaterial({
+        color: 0x00e5ff,
+        transparent: true,
+        opacity: 0.85,
+        blending: THREE.AdditiveBlending
+      });
+
+      function build3DHexField() {
+        const dx = HEX_R * 1.732;
+        const dz = HEX_R * 1.5;
+        for (let row = -13; row <= 16; row++) {
+          for (let col = -16; col <= 16; col++) {
+            const x = col * dx + (row % 2 !== 0 ? dx * 0.5 : 0);
+            const z = row * dz;
+            const distFromBoss = Math.hypot(x, z);
+            if (distFromBoss < 14 || distFromBoss > 86) continue;
+
+            const hexLine = new THREE.Line(sharedHexGeo, sharedWhiteHexMat);
+            hexLine.position.set(x, 0, z);
+            hexFieldGroup.add(hexLine);
+
+            hexCells.push({
+              mesh: hexLine,
+              x,
+              z,
+              energy: 0,
+              cyanEnergy: 0
+            });
+          }
+        }
+      }
+
+      build3DHexField();
+
+      function triggerHexRipple(x, z, strength = 1.0, isCyan = false, maxRadius = 28) {
+        hexRipples.push({
+          x,
+          z,
+          radius: 0.5,
+          speed: isCyan ? 52 : 34,
+          maxRadius,
+          strength,
+          isCyan
+        });
+      }
+
+      // Draw Semi-Circular Orbital Track Arcs in 3D Space
+      const orbitTrackMeshes = [];
+      ORBIT_RINGS.forEach((ring, idx) => {
+        const arcPts = [];
+        const segments = 72;
+        for (let i = 0; i <= segments; i++) {
+          const t = -MAX_ORBIT_ANGLE + (i / segments) * (MAX_ORBIT_ANGLE * 2);
+          arcPts.push(new THREE.Vector3(Math.sin(t) * ring.radius, -2.5, Math.cos(t) * ring.radius));
+        }
+        const arcGeo = new THREE.BufferGeometry().setFromPoints(arcPts);
+        const arcMat = new THREE.LineBasicMaterial({
+          color: 0xffffff,
+          transparent: true,
+          opacity: idx === 2 ? 0.45 : 0.16,
+          blending: THREE.AdditiveBlending
+        });
+        const arcLine = new THREE.Line(arcGeo, arcMat);
+        scene.add(arcLine);
+        orbitTrackMeshes.push(arcLine);
+      });
+
+      // =========================================================================
+      // PLAYER 3D STARFIGHTER: PYRO
+      // =========================================================================
+      const pyroGroup = new THREE.Group();
+      scene.add(pyroGroup);
+
+      const hullMat = new THREE.MeshStandardMaterial({
+        color: 0xf4f7ff,
+        emissive: 0x222836,
+        metalness: 0.65,
+        roughness: 0.25
+      });
+
+      const darkTrimMat = new THREE.MeshStandardMaterial({
+        color: 0x161922,
+        metalness: 0.8,
+        roughness: 0.3
+      });
+
+      const wingEdgeMat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.9
+      });
+
+      // Central Fuselage (Nose points along -Z in local ship space)
+      const fuselageGeo = new THREE.ConeGeometry(0.68, 4.4, 6);
+      fuselageGeo.rotateX(-Math.PI / 2);
+      const fuselage = new THREE.Mesh(fuselageGeo, hullMat);
+      pyroGroup.add(fuselage);
+
+      // Cockpit Canopy
+      const canopyGeo = new THREE.BoxGeometry(0.56, 0.36, 1.35);
+      const canopyMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      const canopy = new THREE.Mesh(canopyGeo, canopyMat);
+      canopy.position.set(0, 0.28, -0.15);
+      pyroGroup.add(canopy);
+
+      // Twin Forward Interceptor Prongs
+      const prongGeo = new THREE.BoxGeometry(0.16, 0.14, 2.3);
+      const leftProng = new THREE.Mesh(prongGeo, hullMat);
+      leftProng.position.set(-0.62, -0.04, -1.25);
+      const rightProng = new THREE.Mesh(prongGeo, hullMat);
+      rightProng.position.set(0.62, -0.04, -1.25);
+      pyroGroup.add(leftProng, rightProng);
+
+      // Swept Delta Wings
+      const wingGeo = new THREE.BoxGeometry(4.4, 0.1, 1.3);
+      const wings = new THREE.Mesh(wingGeo, darkTrimMat);
+      wings.position.set(0, -0.06, 0.55);
+      pyroGroup.add(wings);
+
+      // Glowing Wing Leading Strips (turn electric cyan when Overdrive unlocks)
+      const stripGeo = new THREE.BoxGeometry(4.5, 0.08, 0.16);
+      const wingStrip = new THREE.Mesh(stripGeo, wingEdgeMat);
+      wingStrip.position.set(0, -0.03, 0.02);
+      pyroGroup.add(wingStrip);
+
+      // Twin Thruster Flames (+Z rear)
+      const flameGeo = new THREE.ConeGeometry(0.24, 1.6, 8);
+      flameGeo.rotateX(Math.PI / 2);
+      const flameMat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.88,
+        blending: THREE.AdditiveBlending
+      });
+      const leftFlame = new THREE.Mesh(flameGeo, flameMat);
+      leftFlame.position.set(-0.46, 0, 2.55);
+      const rightFlame = new THREE.Mesh(flameGeo, flameMat);
+      rightFlame.position.set(0.46, 0, 2.55);
+      pyroGroup.add(leftFlame, rightFlame);
+
+      // Forward Charge Halo (for Cyan Hyper-Beam wind-up)
+      const chargeHaloGeo = new THREE.TorusGeometry(1.15, 0.06, 8, 24);
+      const chargeHaloMat = new THREE.MeshBasicMaterial({
+        color: 0x00e5ff,
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending
+      });
+      const chargeHalo = new THREE.Mesh(chargeHaloGeo, chargeHaloMat);
+      chargeHalo.position.set(0, 0, -2.5);
+      pyroGroup.add(chargeHalo);
+
+      // =========================================================================
+      // 3D BOSS: COSMIC LEVIATHAN (PLANETARY HEX-CEPHALOPOD)
+      // =========================================================================
+      const bossGroup = new THREE.Group();
+      bossGroup.position.set(0, 1.8, 0);
+      scene.add(bossGroup);
+
+      // Armored Mantle / Core Sphere
+      const bossCoreMat = new THREE.MeshStandardMaterial({
+        color: 0x10131c,
+        emissive: 0x262d3d,
+        metalness: 0.85,
+        roughness: 0.2
+      });
+      const bossCore = new THREE.Mesh(new THREE.IcosahedronGeometry(5.6, 2), bossCoreMat);
+      bossGroup.add(bossCore);
+
+      // Glowing Wireframe Cage over Boss Mantle
+      const bossWireMat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.35
+      });
+      const bossWire = new THREE.Mesh(new THREE.IcosahedronGeometry(5.95, 1), bossWireMat);
+      bossGroup.add(bossWire);
+
+      // Glowing Ocular Core Eye
+      const eyeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      const bossEye = new THREE.Mesh(new THREE.SphereGeometry(1.85, 20, 20), eyeMat);
+      bossEye.position.set(0, 0.4, 4.9);
+      bossGroup.add(bossEye);
+
+      // Rotating Hexagonal Planetary Halos around Boss
+      const bossHalo1 = new THREE.Mesh(
+        new THREE.TorusGeometry(8.6, 0.14, 6, 6),
+        new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7 })
+      );
+      bossHalo1.rotation.x = Math.PI * 0.35;
+      bossGroup.add(bossHalo1);
+
+      const bossHalo2 = new THREE.Mesh(
+        new THREE.TorusGeometry(10.8, 0.1, 6, 6),
+        new THREE.MeshBasicMaterial({ color: 0x9aa6c4, transparent: true, opacity: 0.45 })
+      );
+      bossHalo2.rotation.x = -Math.PI * 0.28;
+      bossGroup.add(bossHalo2);
+
+      // 8 Articulated 3D Tentacles
+      const tentacles = [];
+      const tentacleCount = 8;
+      const segmentsPerTentacle = 9;
+
+      for (let t = 0; t < tentacleCount; t++) {
+        const baseAngle = (t / tentacleCount) * Math.PI * 2;
+        const tGroup = new THREE.Group();
+        tGroup.rotation.y = baseAngle;
+        bossGroup.add(tGroup);
+
+        const segs = [];
+        for (let s = 0; s < segmentsPerTentacle; s++) {
+          const radius = 0.72 * (1 - s / (segmentsPerTentacle + 1.5));
+          const segGeo = new THREE.OctahedronGeometry(radius, 0);
+          const segMat = new THREE.MeshStandardMaterial({
+            color: s % 2 === 0 ? 0xe6ecfa : 0x1e2433,
+            emissive: s === segmentsPerTentacle - 1 ? 0xffffff : 0x111520,
+            emissiveIntensity: s === segmentsPerTentacle - 1 ? 0.9 : 0.3,
+            metalness: 0.7,
+            roughness: 0.25
+          });
+          const mesh = new THREE.Mesh(segGeo, segMat);
+          tGroup.add(mesh);
+          segs.push(mesh);
+        }
+        tentacles.push({ group: tGroup, segs, phase: t * 0.85, baseAngle });
+      }
+
+      // =========================================================================
+      // FORWARD ELECTRIC-BLUE HYPER-BEAM MESHES (STRICTLY FORWARD ALONG -Z)
+      // =========================================================================
+      const hyperBeamGroup = new THREE.Group();
+      hyperBeamGroup.visible = false;
+      scene.add(hyperBeamGroup);
+
+      // Inner white-hot core cylinder extending forward (+Z in Three.js lookAt space) from Pyro's nose toward the Boss
+      const beamCoreGeo = new THREE.CylinderGeometry(0.42, 0.42, 1, 16, 1, true);
+      beamCoreGeo.rotateX(Math.PI / 2);
+      beamCoreGeo.translate(0, 0, 0.5);
+      const beamCoreMat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.95,
+        blending: THREE.AdditiveBlending
+      });
+      const beamCoreMesh = new THREE.Mesh(beamCoreGeo, beamCoreMat);
+      hyperBeamGroup.add(beamCoreMesh);
+
+      // Outer glowing cyan plasma sheath extending forward (+Z in Three.js lookAt space)
+      const beamOuterGeo = new THREE.CylinderGeometry(1.15, 1.45, 1, 16, 1, true);
+      beamOuterGeo.rotateX(Math.PI / 2);
+      beamOuterGeo.translate(0, 0, 0.5);
+      const beamOuterMat = new THREE.MeshBasicMaterial({
+        color: 0x00e5ff,
+        transparent: true,
+        opacity: 0.55,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide
+      });
+      const beamOuterMesh = new THREE.Mesh(beamOuterGeo, beamOuterMat);
+      hyperBeamGroup.add(beamOuterMesh);
+
+      // =========================================================================
+      // GAME STATE, ARRAYS & HUD UPDATERS
+      // =========================================================================
+      const MAX_BOSS_HP = 14000;
+      const SPECIAL_UNLOCK_DAMAGE = MAX_BOSS_HP * 0.25; // 3,500 DMG
+
+      const state = {
+        running: false,
+        gameOver: false,
+        victory: false,
+        elapsed: 0,
+        bossHp: MAX_BOSS_HP,
+        totalDamageDealt: 0,
+        specialUnlocked: false,
+        specialCooldown: 0,
+        specialCharging: 0,
+        specialFiring: 0,
+        hull: 100,
+        ringIndex: 2,
+        currentRadius: ORBIT_RINGS[2].radius,
+        orbitAngle: 0,
+        angularVel: 0,
+        bankAngle: 0,
+        fireCooldown: 0,
+        bossHitFlash: 0,
+        bossAttackTimer: 1.6,
+        screenShake: 0
+      };
+
+      const playerProjectiles = [];
+      const enemyOrbs = [];
+      const sectorWarnings = [];
+      const shockwaveRings = [];
+      const particles = [];
+
+      const boltGeo = new THREE.BoxGeometry(0.18, 0.18, 2.2);
+      const boltMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      const sharedParticleGeo = new THREE.BoxGeometry(0.26, 0.26, 0.26);
+      const sharedWhiteParticleMat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.9,
+        blending: THREE.AdditiveBlending
+      });
+      const sharedCyanParticleMat = new THREE.MeshBasicMaterial({
+        color: 0x00e5ff,
+        transparent: true,
+        opacity: 0.95,
+        blending: THREE.AdditiveBlending
+      });
+      const sharedShockwaveGeo = new THREE.RingGeometry(0.6, 1.35, 6);
+      sharedShockwaveGeo.rotateX(-Math.PI / 2);
+      const sharedShockwaveMat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.85,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide
+      });
+      const sharedWarnGeo = new THREE.PlaneGeometry(3.6, 84);
+      sharedWarnGeo.rotateX(-Math.PI / 2);
+      const sharedWarnMat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.25,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide
+      });
+
+      function updateOrbitHUD() {
+        const ring = ORBIT_RINGS[state.ringIndex];
+        ringReadout.textContent = ring.label;
+        threatBadge.textContent = ring.threatText;
+        threatBadge.classList.toggle('high-risk', state.ringIndex <= 1);
+        multReadout.textContent = `${ring.mult.toFixed(2)}x`;
+        distReadout.textContent = `ORBIT RADIUS: ${Math.round(state.currentRadius)}m`;
+
+        orbitTrackMeshes.forEach((line, idx) => {
+          line.material.opacity = idx === state.ringIndex ? 0.55 : 0.15;
+        });
+      }
+
+      function updateBossHUD() {
+        const clampedHp = Math.max(0, Math.ceil(state.bossHp));
+        const pct = (clampedHp / MAX_BOSS_HP) * 100;
+        bossHpText.textContent = `${clampedHp.toLocaleString()} / ${MAX_BOSS_HP.toLocaleString()} HP`;
+        bossBarFill.style.width = `${pct}%`;
+      }
+
+      function updateHullHUD() {
+        const clampedHull = Math.max(0, Math.ceil(state.hull));
+        hullText.textContent = `${clampedHull}%`;
+        hullBarFill.style.width = `${clampedHull}%`;
+        hullBarFill.style.background = clampedHull <= 30 ? '#ff3b5c' : '#ffffff';
+      }
+
+      function updateSpecialHUD() {
+        if (!state.specialUnlocked) {
+          const dealt = Math.min(SPECIAL_UNLOCK_DAMAGE, Math.floor(state.totalDamageDealt));
+          const pct = (dealt / SPECIAL_UNLOCK_DAMAGE) * 100;
+          specialCard.classList.remove('ready');
+          specialTitle.textContent = 'HYPER-BEAM // DEAL 25% DMG';
+          specialSub.textContent = `${dealt.toLocaleString()} / ${SPECIAL_UNLOCK_DAMAGE.toLocaleString()} DMG TO UNLOCK`;
+          specialProgressFill.style.width = `${pct}%`;
+          wingEdgeMat.color.setHex(0xffffff);
+        } else if (state.specialFiring > 0 || state.specialCharging > 0) {
+          specialCard.classList.add('ready');
+          specialTitle.textContent = 'CYAN HYPER-BEAM // ACTIVE';
+          specialSub.textContent = 'DISCHARGING OVERDRIVE LANCE';
+          specialProgressFill.style.width = '100%';
+          wingEdgeMat.color.setHex(0x00e5ff);
+        } else if (state.specialCooldown > 0) {
+          const cdPct = Math.max(0, 100 - (state.specialCooldown / 9.0) * 100);
+          specialCard.classList.remove('ready');
+          specialTitle.textContent = 'HYPER-BEAM // RECHARGING';
+          specialSub.textContent = `READY IN ${state.specialCooldown.toFixed(1)}s`;
+          specialProgressFill.style.width = `${cdPct}%`;
+          wingEdgeMat.color.setHex(0x88d8ff);
+        } else {
+          specialCard.classList.add('ready');
+          specialTitle.textContent = 'HYPER-BEAM // READY [E]';
+          specialSub.textContent = 'PRESS [E] OR RIGHT-CLICK TO FIRE';
+          specialProgressFill.style.width = '100%';
+          wingEdgeMat.color.setHex(0x00e5ff);
+        }
+      }
+
+      function shiftRing(delta) {
+        if (!state.running) return;
+        const next = Math.max(0, Math.min(ORBIT_RINGS.length - 1, state.ringIndex + delta));
+        if (next !== state.ringIndex) {
+          state.ringIndex = next;
+          playRingShiftSound(next);
+          triggerHexRipple(pyroGroup.position.x, pyroGroup.position.z, 0.75, false, 18);
+          updateOrbitHUD();
+        }
+      }
+
+      // =========================================================================
+      // INPUT CONTROLS (KEYBOARD, MOUSE & MOBILE TOUCH)
+      // =========================================================================
+      const keys = {};
+
+      window.addEventListener('keydown', (e) => {
+        keys[e.code] = true;
+        if (!state.running) return;
+
+        if (e.code === 'KeyW' || e.code === 'ArrowUp') {
+          shiftRing(-1); // Move inward toward boss (higher DMG & aggression)
+        } else if (e.code === 'KeyS' || e.code === 'ArrowDown') {
+          shiftRing(1); // Move outward away from boss
+        } else if (e.code === 'KeyE') {
+          triggerHyperBeam();
+        }
+      });
+
+      window.addEventListener('keyup', (e) => {
+        keys[e.code] = false;
+      });
+
+      window.addEventListener('mousedown', (e) => {
+        if (!state.running) return;
+        if (e.button === 0) {
+          keys['MouseLeft'] = true;
+        } else if (e.button === 2) {
+          triggerHyperBeam();
+        }
+      });
+
+      window.addEventListener('mouseup', (e) => {
+        if (e.button === 0) {
+          keys['MouseLeft'] = false;
+        }
+      });
+
+      window.addEventListener('contextmenu', (e) => e.preventDefault());
+
+      // Touch controls binding
+      function bindHoldBtn(id, keyCode) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('touchstart', (e) => {
+          e.preventDefault();
+          keys[keyCode] = true;
+        });
+        el.addEventListener('touchend', (e) => {
+          e.preventDefault();
+          keys[keyCode] = false;
+        });
+      }
+      bindHoldBtn('btn-left', 'KeyA');
+      bindHoldBtn('btn-right', 'KeyD');
+      bindHoldBtn('btn-fire', 'Space');
+
+      const btnIn = document.getElementById('btn-in');
+      const btnOut = document.getElementById('btn-out');
+      const btnSpecial = document.getElementById('btn-special');
+      if (btnIn) btnIn.addEventListener('click', () => shiftRing(-1));
+      if (btnOut) btnOut.addEventListener('click', () => shiftRing(1));
+      if (btnSpecial) btnSpecial.addEventListener('click', () => triggerHyperBeam());
+
+      function firePrimaryCannons() {
+        const ring = ORBIT_RINGS[state.ringIndex];
+        const dmgPerBolt = 28 * ring.mult;
+        const bossTarget = new THREE.Vector3(0, bossGroup.position.y * 0.45, 0);
+
+        // Spawn twin bolts from Pyro's forward prongs aimed directly at the Boss
+        [-0.62, 0.62].forEach((offsetX) => {
+          const bolt = new THREE.Mesh(boltGeo, boltMat);
+          const localOffset = new THREE.Vector3(offsetX, 0, -2.2);
+          localOffset.applyQuaternion(pyroGroup.quaternion);
+          bolt.position.copy(pyroGroup.position).add(localOffset);
+
+          // Aim directly from muzzle position toward the Boss core
+          const aimDir = bossTarget.clone().sub(bolt.position).normalize();
+          bolt.lookAt(bolt.position.clone().add(aimDir));
+          scene.add(bolt);
+
+          playerProjectiles.push({
+            mesh: bolt,
+            vel: aimDir.multiplyScalar(125),
+            damage: dmgPerBolt,
+            life: 1.4
+          });
+        });
+
+        playLaserSound(ring.mult);
+        triggerHexRipple(pyroGroup.position.x, pyroGroup.position.z, 0.35, false, 11);
+      }
+
+      function triggerHyperBeam() {
+        if (!state.specialUnlocked || state.specialCooldown > 0 || state.specialCharging > 0 || state.specialFiring > 0) {
+          return;
+        }
+        state.specialCharging = 0.45;
+        state.screenShake = 0.35;
+        playHyperBeamSound();
+        triggerHexRipple(pyroGroup.position.x, pyroGroup.position.z, 1.4, true, 32);
+        updateSpecialHUD();
+      }
+
+      function applyDamageToBoss(amount, hitPoint, isCyan = false) {
+        if (!state.running) return;
+        state.bossHp -= amount;
+        state.totalDamageDealt += amount;
+        state.bossHitFlash = isCyan ? 0.25 : 0.08;
+
+        if (!state.specialUnlocked && state.totalDamageDealt >= SPECIAL_UNLOCK_DAMAGE) {
+          state.specialUnlocked = true;
+          triggerHexRipple(pyroGroup.position.x, pyroGroup.position.z, 1.6, true, 38);
+        }
+
+        spawnBurstParticles(hitPoint, isCyan ? 0x00e5ff : 0xffffff, isCyan ? 18 : 6, isCyan ? 22 : 12);
+        triggerHexRipple(hitPoint.x, hitPoint.z, isCyan ? 1.5 : 0.45, isCyan, isCyan ? 36 : 14);
+
+        updateBossHUD();
+        updateSpecialHUD();
+
+        if (state.bossHp <= 0) {
+          endGame(true);
+        }
+      }
+
+      function damagePyro(amount) {
+        if (!state.running) return;
+        state.hull -= amount;
+        state.screenShake = Math.max(state.screenShake, 0.55);
+        playDamageSound();
+        spawnBurstParticles(pyroGroup.position, 0xffffff, 14, 16);
+        updateHullHUD();
+
+        if (state.hull <= 0) {
+          endGame(false);
+        }
+      }
+
+      function spawnBurstParticles(origin, colorHex, count, speedScale) {
+        const cappedCount = Math.min(count, 8);
+        const mat = colorHex === 0x00e5ff ? sharedCyanParticleMat : sharedWhiteParticleMat;
+
+        for (let i = 0; i < cappedCount; i++) {
+          const mesh = new THREE.Mesh(sharedParticleGeo, mat);
+          mesh.position.copy(origin);
+          const vel = new THREE.Vector3(
+            (Math.random() - 0.5) * 2,
+            (Math.random() - 0.5) * 2,
+            (Math.random() - 0.5) * 2
+          )
+            .normalize()
+            .multiplyScalar(speedScale * (0.4 + Math.random() * 0.8));
+          scene.add(mesh);
+          particles.push({ mesh, vel, life: 0.35 + Math.random() * 0.2, maxLife: 0.55 });
+        }
+      }
+
+      // Boss Attacks (Scale in speed & count as Pyro enters inner rings)
+      const orbGeo = new THREE.OctahedronGeometry(0.85, 0);
+      const orbMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+
+      function spawnBossAttack() {
+        const ring = ORBIT_RINGS[state.ringIndex];
+        const aggr = ring.aggression * 1.35;
+
+        // 1. High-Velocity Radial Plasma Volley aimed toward Pyro's orbital arc
+        const volleyCount = state.ringIndex <= 1 ? 5 : 3;
+        const spreadStep = 0.14;
+        for (let i = 0; i < volleyCount; i++) {
+          const offsetAngle = (i - (volleyCount - 1) / 2) * spreadStep;
+          const targetAngle = state.orbitAngle + offsetAngle;
+          const dir = new THREE.Vector3(Math.sin(targetAngle), 0, Math.cos(targetAngle)).normalize();
+
+          const orb = new THREE.Mesh(orbGeo, orbMat);
+          orb.position.set(dir.x * 7.5, 0, dir.z * 7.5);
+          scene.add(orb);
+
+          enemyOrbs.push({
+            mesh: orb,
+            vel: dir.multiplyScalar(36 * aggr),
+            life: 4.0
+          });
+        }
+
+        // 2. NEW BOSS POWER: Expanding Hex-Nova Shockwave Ring (Forces radial ring shifts!)
+        if (Math.random() < 0.55) {
+          const safeRingIdx = Math.floor(Math.random() * ORBIT_RINGS.length);
+          const waveMesh = new THREE.Mesh(sharedShockwaveGeo, sharedShockwaveMat);
+          waveMesh.position.set(0, -0.4, 0);
+          scene.add(waveMesh);
+
+          // Highlight the safe gap ring on the hex-field
+          const safeRadius = ORBIT_RINGS[safeRingIdx].radius;
+          triggerHexRipple(Math.sin(state.orbitAngle) * safeRadius, Math.cos(state.orbitAngle) * safeRadius, 1.4, true, 16);
+
+          shockwaveRings.push({
+            mesh: waveMesh,
+            radius: 7.0,
+            speed: 32 * aggr,
+            safeRingIdx,
+            hitPlayers: false
+          });
+        }
+
+        // 3. Rapid Telegraphed Sector Sweep
+        if (state.ringIndex <= 3 && Math.random() < 0.72) {
+          const sweepAngle = state.orbitAngle + (Math.random() - 0.5) * 0.24;
+          const len = 84;
+          const warnMesh = new THREE.Mesh(sharedWarnGeo, sharedWarnMat);
+          warnMesh.position.set(Math.sin(sweepAngle) * (len * 0.5), -1.8, Math.cos(sweepAngle) * (len * 0.5));
+          warnMesh.rotation.y = sweepAngle;
+          scene.add(warnMesh);
+
+          sectorWarnings.push({
+            mesh: warnMesh,
+            angle: sweepAngle,
+            timer: Math.max(0.55, 0.95 / aggr),
+            fired: false
+          });
+        }
+      }
+
+      // =========================================================================
+      // GAME LIFECYCLE (START / RESET / VICTORY / DEFEAT)
+      // =========================================================================
+      function resetGame() {
+        // Clear existing projectiles, orbs, warnings, particles
+        playerProjectiles.forEach((p) => scene.remove(p.mesh));
+        playerProjectiles.length = 0;
+
+        enemyOrbs.forEach((o) => scene.remove(o.mesh));
+        enemyOrbs.length = 0;
+
+        sectorWarnings.forEach((w) => scene.remove(w.mesh));
+        sectorWarnings.length = 0;
+
+        shockwaveRings.forEach((sw) => scene.remove(sw.mesh));
+        shockwaveRings.length = 0;
+
+        particles.forEach((pt) => scene.remove(pt.mesh));
+        particles.length = 0;
+
+        state.bossHp = MAX_BOSS_HP;
+        state.totalDamageDealt = 0;
+        state.specialUnlocked = false;
+        state.specialCooldown = 0;
+        state.specialCharging = 0;
+        state.specialFiring = 0;
+        state.hull = 100;
+        state.ringIndex = 2;
+        state.currentRadius = ORBIT_RINGS[2].radius;
+        state.orbitAngle = 0;
+        state.angularVel = 0;
+        state.bankAngle = 0;
+        state.fireCooldown = 0;
+        state.bossHitFlash = 0;
+        state.bossAttackTimer = 1.6;
+        state.screenShake = 0;
+        state.gameOver = false;
+        state.victory = false;
+        state.running = true;
+
+        hyperBeamGroup.visible = false;
+        chargeHaloMat.opacity = 0;
+
+        orbitTrackMeshes.forEach((line, idx) => {
+          line.material.opacity = idx === state.ringIndex ? 0.55 : 0.15;
+        });
+
+        updateOrbitHUD();
+        updateBossHUD();
+        updateHullHUD();
+        updateSpecialHUD();
+
+        overlay.classList.add('hidden');
+      }
+
+      function endGame(victory) {
+        state.running = false;
+        state.gameOver = true;
+        state.victory = victory;
+        hyperBeamGroup.visible = false;
+
+        if (victory) {
+          modalKicker.textContent = 'SECTOR SECURED // LEVIATHAN NEUTRALIZED';
+          modalTitle.textContent = 'VICTORY // OMEGA-HEX';
+          modalDesc.innerHTML =
+            'Pyro shattered the Cosmic Leviathan across the orbital hex-lattice. Ready for another orbital engagement?';
+          launchBtn.textContent = 'RE-ENGAGE';
+        } else {
+          modalKicker.textContent = 'HULL BREACHED // SIGNAL LOST';
+          modalTitle.textContent = 'PYRO DOWN';
+          modalDesc.innerHTML =
+            'Inner rings multiply damage up to <strong>4.00x</strong>, but require sharp orbital evasion. Re-launch to try again.';
+          launchBtn.textContent = 'RETRY ORBIT';
+        }
+
+        overlay.classList.remove('hidden');
+      }
+
+      launchBtn.addEventListener('click', () => {
+        initAudio();
+        resetGame();
+      });
+
+      // =========================================================================
+      // MAIN 3D SIMULATION & RENDER LOOP
+      // =========================================================================
+      let lastTime = performance.now();
+
+      function animate(now = performance.now()) {
+        requestAnimationFrame(animate);
+
+        const rawDt = Math.min(0.05, (now - lastTime) / 1000);
+        lastTime = now;
+
+        // Subtle time dilation during Hyper-Beam charge wind-up
+        const timeScale = state.specialCharging > 0 ? 0.35 : 1.0;
+        const dt = rawDt * timeScale;
+        state.elapsed += dt;
+
+        // Slowly rotate starfield
+        starField.rotation.y += rawDt * 0.008;
+
+        // Animate Boss (Cosmic Leviathan — Faster & More Menacing)
+        const aggrSpeed = state.running ? ORBIT_RINGS[state.ringIndex].aggression * 1.35 : 1.25;
+        bossGroup.position.y = 1.8 + Math.sin(state.elapsed * 2.8) * 1.05;
+        bossGroup.rotation.y = Math.sin(state.elapsed * 1.4) * 0.35;
+        bossCore.rotation.y += dt * 0.85 * aggrSpeed;
+        bossWire.rotation.y -= dt * 0.65 * aggrSpeed;
+        bossHalo1.rotation.z += dt * 1.45 * aggrSpeed;
+        bossHalo2.rotation.z -= dt * 1.15 * aggrSpeed;
+
+        // Boss hit flash feedback
+        if (state.bossHitFlash > 0) {
+          state.bossHitFlash -= rawDt;
+          bossCoreMat.emissive.setHex(0xffffff);
+          bossCoreMat.emissiveIntensity = 0.85;
+        } else {
+          bossCoreMat.emissive.setHex(0x262d3d);
+          bossCoreMat.emissiveIntensity = 0.45;
+        }
+
+        // Animate 8 Segmented 3D Tentacles
+        tentacles.forEach((tent) => {
+          const waveSpeed = 4.2 * aggrSpeed;
+          for (let s = 0; s < tent.segs.length; s++) {
+            const seg = tent.segs[s];
+            const tNorm = s / tent.segs.length;
+            const reach = 5.4 + s * 1.45;
+            const curlY = -1.2 - Math.sin(state.elapsed * waveSpeed + tent.phase - s * 0.45) * (2.1 + tNorm * 2.6);
+            const swayZ = Math.cos(state.elapsed * waveSpeed * 0.9 + tent.phase - s * 0.35) * (1.25 * tNorm);
+            seg.position.set(reach, curlY, swayZ);
+            seg.rotation.z = state.elapsed * 2.6 + s;
+          }
+        });
+
+        // Update Reactive 3D Hex-Field Ripples
+        for (let i = hexRipples.length - 1; i >= 0; i--) {
+          const rip = hexRipples[i];
+          rip.radius += rip.speed * rawDt;
+          if (rip.radius > rip.maxRadius) {
+            hexRipples.splice(i, 1);
+          }
+        }
+
+        for (let i = 0; i < hexCells.length; i++) {
+          const cell = hexCells[i];
+          cell.energy *= Math.pow(0.06, rawDt);
+          cell.cyanEnergy *= Math.pow(0.08, rawDt);
+
+          for (let r = 0; r < hexRipples.length; r++) {
+            const rip = hexRipples[r];
+            const d = Math.hypot(cell.x - rip.x, cell.z - rip.z);
+            const band = Math.abs(d - rip.radius);
+            if (band < 3.4) {
+              const pulse = (1 - band / 3.4) * rip.strength * (1 - rip.radius / rip.maxRadius);
+              if (rip.isCyan) {
+                cell.cyanEnergy = Math.max(cell.cyanEnergy, pulse);
+              } else {
+                cell.energy = Math.max(cell.energy, pulse);
+              }
+            }
+          }
+
+          if (cell.cyanEnergy > 0.22) {
+            if (cell.mesh.material !== sharedCyanHexMat) cell.mesh.material = sharedCyanHexMat;
+            cell.mesh.visible = true;
+          } else if (cell.energy > 0.14) {
+            if (cell.mesh.material !== sharedWhiteHexMat) cell.mesh.material = sharedWhiteHexMat;
+            cell.mesh.visible = true;
+          } else {
+            cell.mesh.visible = false;
+          }
+        }
+
+        // Active Gameplay Updates
+        if (state.running) {
+          // 1. Orbital Movement Input (A/D or Left/Right)
+          let turnInput = 0;
+          if (keys['KeyA'] || keys['ArrowLeft']) turnInput -= 1;
+          if (keys['KeyD'] || keys['ArrowRight']) turnInput += 1;
+
+          const targetAngVel = turnInput * (1.35 * (42 / state.currentRadius));
+          state.angularVel += (targetAngVel - state.angularVel) * Math.min(1, rawDt * 10);
+          state.orbitAngle += state.angularVel * dt;
+
+          // Clamp to Semi-Circular Planetary Arc
+          if (state.orbitAngle > MAX_ORBIT_ANGLE) {
+            state.orbitAngle = MAX_ORBIT_ANGLE;
+            state.angularVel = 0;
+          } else if (state.orbitAngle < -MAX_ORBIT_ANGLE) {
+            state.orbitAngle = -MAX_ORBIT_ANGLE;
+            state.angularVel = 0;
+          }
+
+          // Smooth Radial Ring Interpolation
+          const targetRadius = ORBIT_RINGS[state.ringIndex].radius;
+          state.currentRadius += (targetRadius - state.currentRadius) * Math.min(1, rawDt * 11);
+
+          // Position Pyro on the Semi-Circular Orbit & Lock Orientation Strictly Toward Boss
+          const px = Math.sin(state.orbitAngle) * state.currentRadius;
+          const pz = Math.cos(state.orbitAngle) * state.currentRadius;
+          pyroGroup.position.set(px, 0, pz);
+
+          // Always face the Boss at (0, 0, 0)
+          pyroGroup.lookAt(0, 0, 0);
+
+          // Smooth Wing Banking into Orbital Strafe
+          const targetBank = -state.angularVel * 0.42;
+          state.bankAngle += (targetBank - state.bankAngle) * Math.min(1, rawDt * 10);
+          pyroGroup.rotateZ(state.bankAngle);
+
+          // Thruster Flame Flicker
+          const flameScale = 0.85 + Math.abs(state.angularVel) * 0.55 + Math.random() * 0.25;
+          leftFlame.scale.set(1, 1, flameScale);
+          rightFlame.scale.set(1, 1, flameScale);
+
+          // 2. Primary Weapon Firing
+          state.fireCooldown -= dt;
+          if ((keys['Space'] || keys['MouseLeft']) && state.fireCooldown <= 0 && state.specialFiring <= 0) {
+            firePrimaryCannons();
+            state.fireCooldown = 0.13;
+          }
+
+          // 3. Special Ability: Electric-Blue Forward Hyper-Beam
+          if (state.specialCooldown > 0) {
+            state.specialCooldown = Math.max(0, state.specialCooldown - rawDt);
+            updateSpecialHUD();
+          }
+
+          if (state.specialCharging > 0) {
+            state.specialCharging -= rawDt;
+            const chargeProg = 1 - Math.max(0, state.specialCharging / 0.45);
+            chargeHaloMat.opacity = chargeProg * 0.95;
+            chargeHalo.scale.setScalar(1.6 - chargeProg * 0.75);
+            chargeHalo.rotation.z += rawDt * 12;
+
+            if (state.specialCharging <= 0) {
+              // Unleash Forward Cyan Hyper-Beam!
+              state.specialCharging = 0;
+              state.specialFiring = 1.15;
+              state.specialCooldown = 9.0;
+              chargeHaloMat.opacity = 0;
+              hyperBeamGroup.visible = true;
+              state.screenShake = 0.85;
+              triggerHexRipple(pyroGroup.position.x, pyroGroup.position.z, 1.8, true, 55);
+              updateSpecialHUD();
+            }
+          }
+
+          if (state.specialFiring > 0) {
+            state.specialFiring -= rawDt;
+
+            // Lock Hyper-Beam origin to Pyro's nose and aim directly (+Z forward) at the Boss core
+            const nosePos = new THREE.Vector3(0, 0, -2.2)
+              .applyQuaternion(pyroGroup.quaternion)
+              .add(pyroGroup.position);
+            const bossCorePos = new THREE.Vector3(0, bossGroup.position.y, 0);
+            hyperBeamGroup.position.copy(nosePos);
+            hyperBeamGroup.lookAt(bossCorePos);
+
+            const distToBoss = nosePos.distanceTo(bossCorePos);
+            const beamLength = Math.max(4, distToBoss - 2.5);
+            beamCoreMesh.scale.set(1 + Math.sin(state.elapsed * 45) * 0.2, 1, beamLength);
+            beamOuterMesh.scale.set(1.2 + Math.cos(state.elapsed * 35) * 0.3, 1.2, beamLength);
+
+            // Continuous Hyper-Beam Damage (~30% of boss HP + proximity bonus)
+            const ringMult = ORBIT_RINGS[state.ringIndex].mult;
+            const beamTickDmg = (3650 + ringMult * 220) * rawDt;
+            const impactPt = new THREE.Vector3(
+              Math.sin(state.orbitAngle) * 5.2,
+              bossCorePos.y,
+              Math.cos(state.orbitAngle) * 5.2
+            );
+            applyDamageToBoss(beamTickDmg, impactPt, true);
+
+            if (state.specialFiring <= 0) {
+              state.specialFiring = 0;
+              hyperBeamGroup.visible = false;
+              updateSpecialHUD();
+            }
+          }
+
+          // 4. Update Player Projectiles
+          for (let i = playerProjectiles.length - 1; i >= 0; i--) {
+            const p = playerProjectiles[i];
+            p.mesh.position.addScaledVector(p.vel, dt);
+            p.life -= dt;
+
+            const distToCore = p.mesh.position.length();
+            if (distToCore <= 6.2) {
+              applyDamageToBoss(p.damage, p.mesh.position.clone(), false);
+              scene.remove(p.mesh);
+              playerProjectiles.splice(i, 1);
+            } else if (p.life <= 0) {
+              scene.remove(p.mesh);
+              playerProjectiles.splice(i, 1);
+            }
+          }
+
+          // 5. Boss Attack Spawner & Enemy Orbs
+          state.bossAttackTimer -= dt * aggrSpeed;
+          if (state.bossAttackTimer <= 0) {
+            spawnBossAttack();
+            state.bossAttackTimer = 1.55;
+          }
+
+          // Update Boss Hex-Nova Shockwave Rings
+          for (let i = shockwaveRings.length - 1; i >= 0; i--) {
+            const sw = shockwaveRings[i];
+            sw.radius += sw.speed * dt;
+            sw.mesh.scale.set(sw.radius, sw.radius, 1);
+            sw.mesh.rotation.y += dt * 2.2;
+            sw.mesh.material.opacity = Math.max(0, 0.92 * (1 - sw.radius / 86));
+
+            if (!sw.hitPlayers && Math.abs(sw.radius - state.currentRadius) < 1.9) {
+              sw.hitPlayers = true;
+              // If player is not on the safe ring, deal shockwave damage
+              if (state.ringIndex !== sw.safeRingIdx) {
+                damagePyro(16);
+              }
+              triggerHexRipple(pyroGroup.position.x, pyroGroup.position.z, 1.1, false, 20);
+            }
+
+            if (sw.radius > 86) {
+              scene.remove(sw.mesh);
+              shockwaveRings.splice(i, 1);
+            }
+          }
+
+          for (let i = enemyOrbs.length - 1; i >= 0; i--) {
+            const orb = enemyOrbs[i];
+            orb.mesh.position.addScaledVector(orb.vel, dt);
+            orb.mesh.rotation.x += dt * 4;
+            orb.mesh.rotation.y += dt * 4;
+            orb.life -= dt;
+
+            if (orb.mesh.position.distanceTo(pyroGroup.position) < 2.15) {
+              damagePyro(14);
+              scene.remove(orb.mesh);
+              enemyOrbs.splice(i, 1);
+            } else if (orb.life <= 0) {
+              scene.remove(orb.mesh);
+              enemyOrbs.splice(i, 1);
+            }
+          }
+
+          // 6. Telegraphed Sector Sweeps
+          for (let i = sectorWarnings.length - 1; i >= 0; i--) {
+            const w = sectorWarnings[i];
+            w.timer -= dt;
+            w.mesh.material.opacity = 0.12 + Math.abs(Math.sin(state.elapsed * 18)) * 0.28;
+
+            if (w.timer <= 0) {
+              // Check if Pyro is inside this radial sector angle
+              const angleDiff = Math.abs(state.orbitAngle - w.angle);
+              if (angleDiff < 0.085) {
+                damagePyro(18);
+              }
+              triggerHexRipple(Math.sin(w.angle) * 38, Math.cos(w.angle) * 38, 0.9, false, 22);
+              scene.remove(w.mesh);
+              sectorWarnings.splice(i, 1);
+            }
+          }
+        } else {
+          // Lobby / Idle Preview Orbit Motion
+          state.orbitAngle = Math.sin(state.elapsed * 0.45) * 0.45;
+          const idleR = ORBIT_RINGS[2].radius;
+          pyroGroup.position.set(Math.sin(state.orbitAngle) * idleR, 0, Math.cos(state.orbitAngle) * idleR);
+          pyroGroup.lookAt(0, 0, 0);
+        }
+
+        // Update Particles
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const pt = particles[i];
+          pt.mesh.position.addScaledVector(pt.vel, rawDt);
+          pt.life -= rawDt;
+          const scale = Math.max(0.05, pt.life / pt.maxLife);
+          pt.mesh.scale.setScalar(scale);
+          if (pt.life <= 0) {
+            pt.mesh.scale.setScalar(1);
+            scene.remove(pt.mesh);
+            particles.splice(i, 1);
+          }
+        }
+
+        // Third-Person Chase Camera Behind Pyro Looking Forward at the Boss
+        const radialOut = new THREE.Vector3(
+          Math.sin(state.orbitAngle),
+          0,
+          Math.cos(state.orbitAngle)
+        ).normalize();
+
+        const camDistBehind = 15.5;
+        const camHeight = 7.4;
+        const desiredCamPos = pyroGroup.position
+          .clone()
+          .addScaledVector(radialOut, camDistBehind)
+          .add(new THREE.Vector3(0, camHeight, 0));
+
+        if (state.screenShake > 0) {
+          state.screenShake = Math.max(0, state.screenShake - rawDt * 2.2);
+          desiredCamPos.x += (Math.random() - 0.5) * state.screenShake * 1.8;
+          desiredCamPos.y += (Math.random() - 0.5) * state.screenShake * 1.8;
+        }
+
+        camera.position.lerp(desiredCamPos, Math.min(1, rawDt * 9));
+        camera.lookAt(0, 1.4, 0);
+
+        renderer.render(scene, camera);
+      }
+
+      // Initialize HUD & Start Render Loop Immediately
+      updateOrbitHUD();
+      updateBossHUD();
+      updateHullHUD();
+      updateSpecialHUD();
+      animate();
+    </script>
+  </body>
+</html>
